@@ -1,0 +1,159 @@
+/* Custom variables for theme matching */
+:root {
+    --tt-fix-bg-light: rgba(241, 241, 242, 0.95);
+    --tt-fix-bg-dark: rgba(47, 47, 47, 0.95);
+    
+    --tt-fix-border-light: rgba(0, 0, 0, 0.06);
+    --tt-fix-border-dark: rgba(255, 255, 255, 0.08);
+    
+    --tt-fix-border-focus-light: rgba(254, 44, 85, 0.3);
+    --tt-fix-border-focus-dark: rgba(254, 44, 85, 0.5);
+    
+    --tt-fix-text-light: #161823;
+    --tt-fix-text-dark: #f1f1f2;
+    
+    --tt-fix-placeholder-light: rgba(22, 24, 35, 0.34);
+    --tt-fix-placeholder-dark: rgba(255, 255, 255, 0.34);
+    
+    --tt-fix-accent: #fe2c55; /* TikTok Red */
+    
+    --tt-fix-shadow-light: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --tt-fix-shadow-dark: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Make native editor root invisible but preserve its layout/size in DOM.
+   We do NOT use pointer-events: none to ensure browser editing APIs (paste/execCommand) work perfectly. */
+.tiktok-native-input-hidden {
+    opacity: 0 !important;
+}
+
+/* Hide the native send button visually but keep it active in layout for robust clicking */
+button[data-e2e="chat-send-button"], 
+button[aria-label*="Send"], 
+button[class*="ButtonSend"] {
+    opacity: 0 !important;
+    position: absolute !important;
+    pointer-events: none !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    z-index: -1000 !important;
+}
+
+/* Floating Custom Container overlaid exactly on top of the native input field */
+.tiktok-chat-fix-container {
+    box-sizing: border-box;
+    display: none; /* Controlled via JS */
+    align-items: flex-end;
+    padding: 6px 12px;
+    background: var(--tt-fix-bg-light);
+    border: 1px solid var(--tt-fix-border-light);
+    border-radius: 8px;
+    box-shadow: var(--tt-fix-shadow-light);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tiktok-chat-fix-container:focus-within {
+    border-color: var(--tt-fix-border-focus-light);
+}
+
+/* Dark Mode class applied dynamically */
+.tiktok-chat-fix-container.dark {
+    background: var(--tt-fix-bg-dark);
+    border-color: var(--tt-fix-border-dark);
+    box-shadow: var(--tt-fix-shadow-dark);
+}
+
+.tiktok-chat-fix-container.dark:focus-within {
+    border-color: var(--tt-fix-border-focus-dark);
+}
+
+/* Input Wrapper */
+.tiktok-chat-fix-input-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+#tiktok-chat-fix-textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--tt-fix-text-light);
+    font-size: 15px;
+    line-height: 20px;
+    padding: 2px 0;
+    margin: 0;
+    outline: none;
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+    font-family: inherit;
+}
+
+.tiktok-chat-fix-container.dark #tiktok-chat-fix-textarea {
+    color: var(--tt-fix-text-dark);
+}
+
+#tiktok-chat-fix-textarea::placeholder {
+    color: var(--tt-fix-placeholder-light);
+}
+
+.tiktok-chat-fix-container.dark #tiktok-chat-fix-textarea::placeholder {
+    color: var(--tt-fix-placeholder-dark);
+}
+
+/* Send Button */
+.tiktok-chat-fix-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--tt-fix-placeholder-light);
+    cursor: not-allowed;
+    margin-left: 8px;
+    margin-bottom: 2px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-send-btn {
+    color: var(--tt-fix-placeholder-dark);
+}
+
+.tiktok-chat-fix-send-btn.active {
+    cursor: pointer;
+    background: var(--tt-fix-accent);
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(254, 44, 85, 0.3);
+}
+
+.tiktok-chat-fix-send-btn.active:hover {
+    transform: scale(1.08);
+}
+
+/* Custom Scrollbar for Textarea */
+#tiktok-chat-fix-textarea::-webkit-scrollbar {
+    width: 4px;
+}
+
+#tiktok-chat-fix-textarea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#tiktok-chat-fix-textarea::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+}
+
+.tiktok-chat-fix-container.dark #tiktok-chat-fix-textarea::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+}
