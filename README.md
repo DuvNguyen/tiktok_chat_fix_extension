@@ -50,6 +50,52 @@ To clean the native input box after copying text or syncing emojis:
 When the native TikTok emoji picker is clicked, it inserts the emoji into the hidden native contenteditable element.
 *   **Fix**: We listen to the native input's `'input'` event. When an emoji is added, we clean any zero-width spaces (`\u200B`), insert it at the cursor position of our custom `<textarea>`, and issue a `CLEAR_INPUT` command to clear the native input.
 
+### 5. Auto-Spam Mode (🔥 Mode)
+A custom spam settings panel is built directly into the top of the chat overlay. 
+*   **Trigger**: Click the 🔥 button to toggle the settings drawer. Or press `Ctrl+Enter` (or `Cmd+Enter` on macOS) to instantly start the loop.
+*   **Options**:
+    *   **Count** (1-99): Number of times to send the text.
+    *   **Delay** (20-2000ms): Gap between consecutive messages.
+*   **Cancellation**: Press the **`Escape` (ESC)** key or click the **⏹️ (Stop)** button in the UI to instantly stop a running spam loop at any point.
+*   **Safety**: Direct React state updating enables super fast loops without UI locks, focus resets, or DOM crash warnings.
+
+### 6. Auto-Sticker Suggestions
+Type keyword synonyms to trigger instant sticker suggestions.
+*   **Keywords**: `huhu` (or `khóc`, `crying`), `haha` (or `cười`, `kaka`), `love` (or `tim`, `thương`), `wow` (or `sốc`), `angry` (or `giận`, `mad`), `hello` (or `hi`, `xin chào`).
+*   **Meme-y & Trendy Set**: Loaded with TikTok-favorite animated transparent stickers (e.g. Quby crying, sad cat stare, crying kitten meme).
+*   **Auto-Send**: The extension bypassed manual submission by polling TikTok's native upload queue. Once the sticker upload completes, it instantly triggers a click event to send it automatically without user action.
+*   **Security & Bypass**: The extension's Background Service Worker fetches the public Giphy transparent CDN assets to bypass CORS/CSP constraints, converts them into File blobs, and programmatically pastes them directly into Draft.js via simulated browser paste events.
+
+## 📖 Hướng Dẫn Sử Dụng / User Guide
+
+### 1. Nhắn Tin Thường / Normal Chatting
+*   **Tiếng Việt**: Gõ văn bản mượt mà tại ô nhập liệu mới mà không lo bị lỗi Telex/VNI hay mất chữ. Nhấn **Enter** để gửi tin nhắn, hoặc **Shift + Enter** để xuống dòng.
+*   **English**: Type smoothly in the new text area without worrying about Vietnamese IME drops or character loss. Press **Enter** to send, or **Shift + Enter** to insert a new line.
+
+### 2. Sử Dụng Emoji / Using Emojis
+*   **Tiếng Việt**: Nhấn nút Emoji gốc của TikTok (ở phía bên phải thanh chat). Biểu tượng được chọn sẽ tự động đồng bộ và hiển thị vào con trỏ chuột của ô nhập liệu mới.
+*   **English**: Click the native TikTok emoji button next to the input area. The selected emoji will be synced and inserted at your cursor position in the custom textarea.
+
+### 3. Chế Độ Spam Tự Động / Auto-Spam Mode (🔥 Mode)
+*   **Tiếng Việt**:
+    *   Nhấp vào nút **🔥** để bật/tắt bảng cấu hình Spam.
+    *   Nhập **Số lượng (Count)** (từ 1 - 99 tin) và **Độ trễ (Delay)** (từ 20ms - 2000ms).
+    *   Nhấn **Ctrl + Enter** (hoặc **Cmd + Enter** trên Mac) để kích hoạt spam nhanh tin nhắn đang nhập.
+    *   Nhấn **Escape (ESC)** hoặc nút **⏹️** để dừng spam khẩn cấp bất kỳ lúc nào.
+*   **English**:
+    *   Click the **🔥** button to toggle the Spam Settings Panel.
+    *   Configure **Count** (1-99) and **Delay** (20-2000ms).
+    *   Press **Ctrl + Enter** (or **Cmd + Enter** on macOS) to instantly start the spam loop for the current message.
+    *   Press **Escape (ESC)** or click the **⏹️ (Stop)** button to abort the loop immediately.
+
+### 4. Gợi Ý Sticker Động / Auto-Stickers Suggestion
+*   **Tiếng Việt**:
+    *   Nhập các từ khóa cảm xúc: `huhu` (`khóc`), `haha` (`cười`, `kaka`), `love` (`tim`, `thương`), `wow` (`sốc`), `angry` (`giận`), `hello` (`hi`, `xin chào`).
+    *   Chọn sticker động yêu thích hiển thị phía trên. Sticker sẽ được tải về, dán và tự động gửi đi ngay khi upload thành công mà không cần thao tác nào khác.
+*   **English**:
+    *   Type keywords like: `huhu` (`crying`), `haha` (`laugh`), `love` (`heart`), `wow` (`surprise`), `angry` (`mad`), `hello` (`hi`).
+    *   Click your favorite animated sticker from the suggestions panel. The extension will fetch, paste, and automatically send the sticker once the upload completes.
+
 ---
 
 ## ⚙️ Customization & Updating Selectors
@@ -65,3 +111,4 @@ const SELECTORS = {
     NATIVE_INPUT: 'div[contenteditable="true"].public-DraftEditor-content, div[contenteditable="true"]',
 };
 ```
+

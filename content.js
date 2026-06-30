@@ -27,6 +27,65 @@ let resizeObserver = null;
 let themeObserver = null;
 let activeNativeInput = null;
 let domObserver = null;
+let isFocusRedirectBlocked = false;
+let isSpamming = false;
+let escapeListener = null;
+
+// Curved Animated Stickers Mapping (using high-quality Giphy transparent sticker assets matching TikTok mobile app memes)
+const STICKER_MAP = {
+    'huhu': [
+        'https://media.giphy.com/media/kcfDb6ihrl4K3Us4Gv/giphy.gif', // Timo/Quby crying (White round character)
+        'https://media.giphy.com/media/10t5T4cGf0GJoY/giphy.gif', // Crying seal/round character
+        'https://media.giphy.com/media/yFQ0ywscgobJK/giphy.gif', // Sad cat staring meme
+        'https://media.giphy.com/media/8YutMatqkTfSE/giphy.gif', // Sad kitten crying meme
+        'https://media.giphy.com/media/OPU6wUKVOA06I/giphy.gif'  // SpongeBob crying
+    ],
+    'haha': [
+        'https://media.giphy.com/media/10t5T4cGf0GJoY/giphy.gif', // Laughing cute
+        'https://media.giphy.com/media/coC17Ku3s3pHG/giphy.gif', // Minion laugh
+        'https://media.giphy.com/media/wW95fEq0gCoSc/giphy.gif', // Laughing cat
+        'https://media.giphy.com/media/1d5ZN04sm44yk/giphy.gif'  // Laughing girl
+    ],
+    'love': [
+        'https://media.giphy.com/media/26hpKunjT8sDSs7zW/giphy.gif', // Heart love
+        'https://media.giphy.com/media/l41JWdNoYRz1Jt7uU/giphy.gif', // Heart sticker
+        'https://media.giphy.com/media/3IUs0MCo9Y750t7V4p/giphy.gif', // Cute bear love
+        'https://media.giphy.com/media/T862e3KeHp4V4sF15M/giphy.gif'  // Heart hands
+    ],
+    'wow': [
+        'https://media.giphy.com/media/3o7527pa7qs9kCG78A/giphy.gif', // Wow sticker
+        'https://media.giphy.com/media/ccCalIfv11gXU2Wn5V/giphy.gif', // Surprised cat
+        'https://media.giphy.com/media/t38v6d91pEAE0/giphy.gif',    // Shocked baby
+        'https://media.giphy.com/media/LfGGW219qPxE4/giphy.gif'     // Minion wow
+    ],
+    'angry': [
+        'https://media.giphy.com/media/l0G18bM1hFkuTcU5G/giphy.gif', // Angry cute
+        'https://media.giphy.com/media/Gj8b1vO9t5FnG/giphy.gif',     // Red face angry
+        'https://media.giphy.com/media/U7b8cc42c7RhM4Qgvt/giphy.gif', // Angry cat
+        'https://media.giphy.com/media/fnQn7xMv7SStG/giphy.gif'     // Mad sponge
+    ],
+    'hello': [
+        'https://media.giphy.com/media/3oKIPnAiaAODhgKBVK/giphy.gif', // Hello sticker
+        'https://media.giphy.com/media/djAPV3L19wW64/giphy.gif',     // Wave cat
+        'https://media.giphy.com/media/dzaUX1mnVW6Sk/giphy.gif',     // Hello bear
+        'https://media.giphy.com/media/l0FF56/giphy.gif'            // Stitch wave
+    ]
+};
+
+const SYNONYMS = {
+    'khóc': 'huhu',
+    'crying': 'huhu',
+    'cười': 'haha',
+    'kaka': 'haha',
+    'tim': 'love',
+    'thương': 'love',
+    'sốc': 'wow',
+    'surprise': 'wow',
+    'giận': 'angry',
+    'mad': 'angry',
+    'hi': 'hello',
+    'xin chào': 'hello'
+};
 
 // ==========================================
 // 3. CORE UTILITIES
@@ -149,8 +208,16 @@ function alignOverlay() {
     overlay.style.left = `${rect.left}px`;
     overlay.style.width = `${rect.width - 110}px`;
 
-    const customHeight = overlay.offsetHeight || rect.height;
-    overlay.style.top = `${rect.bottom - customHeight}px`;
+    let customHeight = overlay.offsetHeight || rect.height;
+    const spamPanel = document.getElementById('tiktok-chat-fix-spam-panel');
+    if (spamPanel && window.getComputedStyle(spamPanel).display === 'flex') {
+        customHeight += spamPanel.offsetHeight;
+    }
+    const stickerPanel = document.getElementById('tiktok-chat-fix-sticker-panel');
+    if (stickerPanel && window.getComputedStyle(stickerPanel).display === 'flex') {
+        customHeight += stickerPanel.offsetHeight;
+    }
+    overlay.style.top = `${rect.bottom - (overlay.offsetHeight || rect.height)}px`;
 
     // Hide the native editor root visually, but preserve its layout/size in DOM
     if (!editorRoot.classList.contains('tiktok-native-input-hidden')) {
@@ -235,6 +302,52 @@ function cleanupLayoutSync() {
 // 5. ACTION & INJECTION LOGIC
 // ==========================================
 
+function updateSpamButtonUI(active) {
+    const spamToggle = document.getElementById('tiktok-chat-fix-spam-toggle');
+    if (!spamToggle) return;
+
+    if (active) {
+        spamToggle.innerHTML = '⏹️';
+        spamToggle.title = 'Dừng Spam (ESC)';
+        spamToggle.classList.add('active');
+        spamToggle.style.color = '#ff9800';
+    } else {
+        spamToggle.innerHTML = '🔥';
+        spamToggle.title = 'Bật/Tắt Bảng Điều Khiển Spam (Ctrl+Enter)';
+        spamToggle.classList.remove('active');
+        spamToggle.style.color = '';
+    }
+}
+
+function waitForNativeSendButtonAndSend() {
+    const selector = 'button[data-e2e="chat-send-button"], button[aria-label*="Send"], button[class*="ButtonSend"]';
+    let attempts = 0;
+    const maxAttempts = 50; // Tối đa 5 giây chờ upload ảnh
+
+    const interval = setInterval(() => {
+        const nativeSendBtn = document.querySelector(selector);
+        attempts++;
+        
+        if (nativeSendBtn) {
+            const isDisabled = nativeSendBtn.disabled || nativeSendBtn.getAttribute('disabled') !== null;
+            if (!isDisabled) {
+                nativeSendBtn.click();
+                clearInterval(interval);
+                return;
+            }
+        }
+        
+        if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            // Fallback gửi qua phím Enter
+            window.postMessage({
+                source: 'tiktok-chat-fix-content',
+                type: 'TRIGGER_ENTER'
+            }, '*');
+        }
+    }, 100);
+}
+
 function handleSendMessage() {
     const textarea = document.getElementById('tiktok-chat-fix-textarea');
     if (!textarea) return;
@@ -267,6 +380,60 @@ function handleSendMessage() {
     }
 }
 
+async function handleSpamSend() {
+    if (isSpamming) return;
+
+    const textarea = document.getElementById('tiktok-chat-fix-textarea');
+    if (!textarea) return;
+
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    const countInput = document.getElementById('tiktok-spam-count');
+    const delayInput = document.getElementById('tiktok-spam-delay');
+    
+    const count = Math.min(99, Math.max(1, parseInt(countInput ? countInput.value : '5') || 5));
+    const delay = Math.min(2000, Math.max(20, parseInt(delayInput ? delayInput.value : '80') || 80));
+
+    // Immediately clear the textarea so it's ready
+    textarea.value = '';
+    textarea.style.height = 'auto';
+    updateSendBtnState();
+    alignOverlay();
+
+    isSpamming = true;
+    updateSpamButtonUI(true);
+
+    // Trigger spam loop
+    for (let i = 0; i < count; i++) {
+        if (!isSpamming) {
+            break;
+        }
+
+        window.postMessage({
+            source: 'tiktok-chat-fix-content',
+            type: 'SEND_MESSAGE',
+            text: text
+        }, '*');
+
+        // Scroll down
+        const nativeInput = document.querySelector(SELECTORS.NATIVE_INPUT);
+        if (nativeInput) {
+            const messagesContainer = findMessagesContainer(nativeInput);
+            if (messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        if (i < count - 1) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+
+    isSpamming = false;
+    updateSpamButtonUI(false);
+}
+
 function updateSendBtnState() {
     const textarea = document.getElementById('tiktok-chat-fix-textarea');
     const sendBtn = document.getElementById('tiktok-chat-fix-send-btn');
@@ -282,6 +449,145 @@ function updateSendBtnState() {
     }
 }
 
+// Sticker suggestions logic
+function checkForStickerSuggestions() {
+    const textarea = document.getElementById('tiktok-chat-fix-textarea');
+    const stickerPanel = document.getElementById('tiktok-chat-fix-sticker-panel');
+    if (!textarea || !stickerPanel) return;
+
+    const text = textarea.value;
+    if (!text.trim()) {
+        stickerPanel.style.display = 'none';
+        alignOverlay();
+        return;
+    }
+
+    // Get the last typed word/segment
+    const words = text.trim().toLowerCase().split(/\s+/);
+    const lastWord = words[words.length - 1];
+
+    let keyword = lastWord;
+    if (SYNONYMS[keyword]) {
+        keyword = SYNONYMS[keyword];
+    }
+
+    if (STICKER_MAP[keyword]) {
+        const stickers = STICKER_MAP[keyword];
+        stickerPanel.innerHTML = '';
+        
+        stickers.forEach(url => {
+            const item = document.createElement('div');
+            item.className = 'tiktok-chat-fix-sticker-item';
+            item.title = `Gửi sticker cho từ "${lastWord}"`;
+            item.innerHTML = `<img src="${url}" />`;
+            
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendSticker(url, lastWord);
+            });
+            
+            stickerPanel.appendChild(item);
+        });
+
+        stickerPanel.style.display = 'flex';
+    } else {
+        stickerPanel.style.display = 'none';
+    }
+    alignOverlay();
+}
+
+function sendSticker(url, keyword) {
+    const textarea = document.getElementById('tiktok-chat-fix-textarea');
+    const stickerPanel = document.getElementById('tiktok-chat-fix-sticker-panel');
+    const nativeInput = document.querySelector(SELECTORS.NATIVE_INPUT);
+
+    if (!nativeInput) return;
+
+    if (stickerPanel) {
+        stickerPanel.style.opacity = '0.5';
+        stickerPanel.style.pointerEvents = 'none';
+    }
+
+    // Call background service worker to fetch the asset bypassing CSP
+    chrome.runtime.sendMessage({ type: 'FETCH_STICKER', url: url }, (response) => {
+        if (stickerPanel) {
+            stickerPanel.style.opacity = '1';
+            stickerPanel.style.pointerEvents = 'auto';
+        }
+
+        if (response && response.success) {
+            if (stickerPanel) {
+                stickerPanel.style.display = 'none';
+            }
+
+            // Convert Base64 dataURL to File
+            const file = dataURLtoFile(response.dataUrl, 'sticker.gif');
+
+            // Temporarily block focus redirect, target native, paste, then restore focus
+            isFocusRedirectBlocked = true;
+            nativeInput.focus();
+
+            // Set selection on the native contenteditable so Draft.js receives paste
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(nativeInput);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+
+            const pasteEvent = new ClipboardEvent('paste', {
+                clipboardData: dataTransfer,
+                bubbles: true,
+                cancelable: true
+            });
+
+            nativeInput.dispatchEvent(pasteEvent);
+
+            // Strip the keyword from the textarea
+            if (textarea) {
+                const val = textarea.value;
+                const lastIndex = val.toLowerCase().lastIndexOf(keyword.toLowerCase());
+                if (lastIndex !== -1) {
+                    textarea.value = val.substring(0, lastIndex) + val.substring(lastIndex + keyword.length);
+                }
+                
+                textarea.style.height = 'auto';
+                textarea.style.height = `${textarea.scrollHeight}px`;
+                updateSendBtnState();
+            }
+
+            // Chờ ảnh upload xong trên TikTok và tự động bấm gửi
+            waitForNativeSendButtonAndSend();
+
+            // Refocus custom textarea
+            setTimeout(() => {
+                if (textarea) textarea.focus();
+                isFocusRedirectBlocked = false;
+                alignOverlay();
+            }, 250);
+
+        } else {
+            console.error('Failed to fetch sticker:', response ? response.error : 'Unknown error');
+            isFocusRedirectBlocked = false;
+        }
+    });
+}
+
+function dataURLtoFile(dataurl, filename) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+}
+
 // ==========================================
 // 6. SETUP & DOM INJECTION
 // ==========================================
@@ -294,9 +600,35 @@ function createOverlay(editorRoot, nativeInput) {
     overlay.className = 'tiktok-chat-fix-container';
     
     overlay.innerHTML = `
+        <!-- Spam Settings Panel -->
+        <div id="tiktok-chat-fix-spam-panel" class="tiktok-chat-fix-spam-panel">
+            <span style="font-weight: 600; color: #ff9800; display: flex; align-items: center; gap: 2px;">
+                🔥 Spam Mode
+            </span>
+            <span style="flex-grow: 1;"></span>
+            <label>
+                Count: 
+                <input type="number" id="tiktok-spam-count" value="5" min="1" max="99" />
+            </label>
+            <label>
+                Delay: 
+                <input type="number" id="tiktok-spam-delay" value="80" min="20" max="2000" step="10" /> ms
+            </label>
+        </div>
+
+        <!-- Sticker Suggestions Panel -->
+        <div id="tiktok-chat-fix-sticker-panel" class="tiktok-chat-fix-sticker-panel">
+            <!-- Populated dynamically via JS -->
+        </div>
+
         <div class="tiktok-chat-fix-input-wrapper">
             <textarea id="tiktok-chat-fix-textarea" placeholder="${getPlaceholderText(editorRoot)}" rows="1"></textarea>
         </div>
+        <!-- Spam Toggle Button -->
+        <button id="tiktok-chat-fix-spam-toggle" class="tiktok-chat-fix-spam-toggle" title="Toggle Auto-Spam Panel (Ctrl+Enter to spam)">
+            🔥
+        </button>
+        <!-- Send Button -->
         <button id="tiktok-chat-fix-send-btn" class="tiktok-chat-fix-send-btn" title="Send Message" disabled>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
@@ -308,23 +640,31 @@ function createOverlay(editorRoot, nativeInput) {
 
     const textarea = document.getElementById('tiktok-chat-fix-textarea');
     const sendBtn = document.getElementById('tiktok-chat-fix-send-btn');
+    const spamToggle = document.getElementById('tiktok-chat-fix-spam-toggle');
+    const spamPanel = document.getElementById('tiktok-chat-fix-spam-panel');
 
     textarea.addEventListener('input', () => {
         textarea.style.height = 'auto';
         textarea.style.height = `${textarea.scrollHeight}px`;
         updateSendBtnState();
+        checkForStickerSuggestions();
         alignOverlay();
     });
 
     textarea.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
             e.preventDefault();
-            handleSendMessage();
+            if (e.ctrlKey || e.metaKey) {
+                handleSpamSend();
+            } else {
+                handleSendMessage();
+            }
         }
     });
 
-    // Native input click/focus redirector
+    // Native input click/focus redirector (respects blocking)
     nativeInput.addEventListener('focus', () => {
+        if (isFocusRedirectBlocked) return;
         setTimeout(() => {
             const txt = document.getElementById('tiktok-chat-fix-textarea');
             if (txt) txt.focus();
@@ -335,6 +675,37 @@ function createOverlay(editorRoot, nativeInput) {
         e.preventDefault();
         handleSendMessage();
     });
+
+    spamToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isSpamming) {
+            isSpamming = false;
+            updateSpamButtonUI(false);
+            return;
+        }
+        const isVisible = window.getComputedStyle(spamPanel).display === 'flex';
+        if (isVisible) {
+            spamPanel.style.display = 'none';
+            spamToggle.classList.remove('active');
+        } else {
+            spamPanel.style.display = 'flex';
+            spamToggle.classList.add('active');
+        }
+        alignOverlay();
+        textarea.focus();
+    });
+
+    // Listen for Escape key to stop spam
+    if (escapeListener) {
+        document.removeEventListener('keydown', escapeListener);
+    }
+    escapeListener = (e) => {
+        if (e.key === 'Escape' && isSpamming) {
+            isSpamming = false;
+            updateSpamButtonUI(false);
+        }
+    };
+    document.addEventListener('keydown', escapeListener);
 
     setupThemeObserver(overlay);
     syncTheme(overlay);
@@ -387,7 +758,13 @@ function cleanupCustomElements() {
         themeObserver = null;
     }
 
+    if (escapeListener) {
+        document.removeEventListener('keydown', escapeListener);
+        escapeListener = null;
+    }
+
     activeNativeInput = null;
+    isSpamming = false;
 
     document.querySelectorAll('.tiktok-native-input-hidden').forEach(el => {
         el.classList.remove('tiktok-native-input-hidden');

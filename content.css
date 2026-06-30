@@ -21,8 +21,7 @@
     --tt-fix-shadow-dark: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Make native editor root invisible but preserve its layout/size in DOM.
-   We do NOT use pointer-events: none to ensure browser editing APIs (paste/execCommand) work perfectly. */
+/* Make native editor root invisible but preserve its layout/size in DOM. */
 .tiktok-native-input-hidden {
     opacity: 0 !important;
 }
@@ -43,6 +42,7 @@ button[class*="ButtonSend"] {
 /* Floating Custom Container overlaid exactly on top of the native input field */
 .tiktok-chat-fix-container {
     box-sizing: border-box;
+    position: relative; /* Essential for relative positioning of the panels */
     display: none; /* Controlled via JS */
     align-items: flex-end;
     padding: 6px 12px;
@@ -107,6 +107,154 @@ button[class*="ButtonSend"] {
     color: var(--tt-fix-placeholder-dark);
 }
 
+/* Spam Toggle Button */
+.tiktok-chat-fix-spam-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    margin-left: 4px;
+    margin-bottom: 2px;
+    flex-shrink: 0;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.tiktok-chat-fix-spam-toggle:hover {
+    transform: scale(1.15);
+    background: rgba(254, 44, 85, 0.08);
+}
+
+.tiktok-chat-fix-spam-toggle.active {
+    background: rgba(255, 152, 0, 0.15);
+    box-shadow: 0 0 6px rgba(255, 152, 0, 0.2);
+}
+
+/* Spam settings panel sitting on top of the chat fix container */
+.tiktok-chat-fix-spam-panel {
+    display: none; /* Controlled via JS */
+    box-sizing: border-box;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--tt-fix-bg-light);
+    border: 1px solid var(--tt-fix-border-light);
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 8px 14px;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--tt-fix-text-light);
+    box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 9998;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-spam-panel {
+    background: var(--tt-fix-bg-dark);
+    border-color: var(--tt-fix-border-dark);
+    color: var(--tt-fix-text-dark);
+}
+
+.tiktok-chat-fix-spam-panel input {
+    width: 48px;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
+    text-align: center;
+    color: inherit;
+    outline: none;
+    font-family: inherit;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-spam-panel input {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.tiktok-chat-fix-spam-panel label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* Sticker suggestions panel */
+.tiktok-chat-fix-sticker-panel {
+    display: none; /* Controlled via JS */
+    box-sizing: border-box;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--tt-fix-bg-light);
+    border: 1px solid var(--tt-fix-border-light);
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 8px 12px;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 9997;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-sticker-panel {
+    background: var(--tt-fix-bg-dark);
+    border-color: var(--tt-fix-border-dark);
+}
+
+.tiktok-chat-fix-sticker-item {
+    display: inline-flex;
+    width: 48px;
+    height: 48px;
+    cursor: pointer;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    padding: 2px;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.5);
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-sticker-item {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.tiktok-chat-fix-sticker-item:hover {
+    transform: scale(1.15);
+    border-color: var(--tt-fix-accent);
+    background: #ffffff;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-sticker-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.tiktok-chat-fix-sticker-item img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
 /* Send Button */
 .tiktok-chat-fix-send-btn {
     display: flex;
@@ -119,7 +267,7 @@ button[class*="ButtonSend"] {
     background: transparent;
     color: var(--tt-fix-placeholder-light);
     cursor: not-allowed;
-    margin-left: 8px;
+    margin-left: 6px;
     margin-bottom: 2px;
     flex-shrink: 0;
     transition: all 0.2s ease;

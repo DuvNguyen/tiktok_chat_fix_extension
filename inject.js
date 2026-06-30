@@ -123,6 +123,25 @@
                 console.error('TikTok Chat Fixer: Direct clear error:', err);
             }
         }
+
+        // Trigger Enter Action (Fallback)
+        if (msg.type === 'TRIGGER_ENTER') {
+            const nativeInput = document.querySelector('div[contenteditable="true"].public-DraftEditor-content, div[contenteditable="true"]');
+            if (!nativeInput) return;
+            try {
+                const enterEvent = new KeyboardEvent('keydown', {
+                    key: 'Enter',
+                    keyCode: 13,
+                    code: 'Enter',
+                    which: 13,
+                    bubbles: true,
+                    cancelable: true
+                });
+                nativeInput.dispatchEvent(enterEvent);
+            } catch (err) {
+                console.error('TikTok Chat Fixer: Trigger enter error:', err);
+            }
+        }
     });
 
     console.log('TikTok Chat Fixer: Injected script listeners registered.');
