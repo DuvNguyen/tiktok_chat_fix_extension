@@ -391,9 +391,11 @@ async function handleSpamSend() {
 
     const countInput = document.getElementById('tiktok-spam-count');
     const delayInput = document.getElementById('tiktok-spam-delay');
+    const modeSelect = document.getElementById('tiktok-spam-mode');
     
+    const mode = modeSelect ? modeSelect.value : 'safe';
     const count = Math.min(99, Math.max(1, parseInt(countInput ? countInput.value : '5') || 5));
-    const delay = Math.min(2000, Math.max(20, parseInt(delayInput ? delayInput.value : '80') || 80));
+    const delay = Math.min(2000, Math.max(0, parseInt(delayInput ? delayInput.value : '80') || 80));
 
     // Immediately clear the textarea so it's ready
     textarea.value = '';
@@ -404,34 +406,108 @@ async function handleSpamSend() {
     isSpamming = true;
     updateSpamButtonUI(true);
 
-    // Trigger spam loop
-    for (let i = 0; i < count; i++) {
-        if (!isSpamming) {
-            break;
-        }
-
-        window.postMessage({
-            source: 'tiktok-chat-fix-content',
-            type: 'SEND_MESSAGE',
-            text: text
-        }, '*');
-
-        // Scroll down
-        const nativeInput = document.querySelector(SELECTORS.NATIVE_INPUT);
-        if (nativeInput) {
-            const messagesContainer = findMessagesContainer(nativeInput);
-            if (messagesContainer) {
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    let ackResolve = null;
+    const ackListener = (event) => {
+        if (event.source === window && event.data && event.data.source === 'tiktok-chat-fix-inject' && event.data.type === 'SEND_MESSAGE_ACK') {
+            if (ackResolve) {
+                ackResolve(event.data.success);
             }
         }
+    };
+    window.addEventListener('message', ackListener);
 
-        if (i < count - 1) {
-            await new Promise(resolve => setTimeout(resolve, delay));
+    try {
+        if (mode === 'safe') {
+            // Mode 1: Safe (Exact count, waiting for ACK verification)
+            for (let i = 0; i < count; i++) {
+                if (!isSpamming) break;
+
+                const ackPromise = new Promise(resolve => {
+                    ackResolve = resolve;
+                    // Failsafe timeout of 600ms to prevent infinite hangs if injection fails
+                    setTimeout(() => resolve(false), 600);
+                });
+
+                window.postMessage({
+                    source: 'tiktok-chat-fix-content',
+                    type: 'SEND_MESSAGE',
+                    text: text
+                }, '*');
+
+                await ackPromise;
+
+                // Scroll down
+                const nativeInput = document.querySelector(SELECTORS.NATIVE_INPUT);
+                if (nativeInput) {
+                    const messagesContainer = findMessagesContainer(nativeInput);
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }
+
+                if (i < count - 1 && isSpamming) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        } else if (mode === 'turbo') {
+            // Mode 2: Turbo (Fast, no ACK verification, maximum speed)
+            for (let i = 0; i < count; i++) {
+                if (!isSpamming) break;
+
+                window.postMessage({
+                    source: 'tiktok-chat-fix-content',
+                    type: 'SEND_MESSAGE',
+                    text: text
+                }, '*');
+
+                // Scroll down
+                const nativeInput = document.querySelector(SELECTORS.NATIVE_INPUT);
+                if (nativeInput) {
+                    const messagesContainer = findMessagesContainer(nativeInput);
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }
+
+                if (i < count - 1 && isSpamming) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        } else if (mode === 'infinite') {
+            // Mode 3: Infinite (Continuous until ESC / Stop button)
+            while (isSpamming) {
+                const ackPromise = new Promise(resolve => {
+                    ackResolve = resolve;
+                    setTimeout(() => resolve(false), 600);
+                });
+
+                window.postMessage({
+                    source: 'tiktok-chat-fix-content',
+                    type: 'SEND_MESSAGE',
+                    text: text
+                }, '*');
+
+                await ackPromise;
+
+                // Scroll down
+                const nativeInput = document.querySelector(SELECTORS.NATIVE_INPUT);
+                if (nativeInput) {
+                    const messagesContainer = findMessagesContainer(nativeInput);
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
+                }
+
+                if (isSpamming) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
         }
+    } finally {
+        window.removeEventListener('message', ackListener);
+        isSpamming = false;
+        updateSpamButtonUI(false);
     }
-
-    isSpamming = false;
-    updateSpamButtonUI(false);
 }
 
 function updateSendBtnState() {
@@ -606,13 +682,21 @@ function createOverlay(editorRoot, nativeInput) {
                 🔥 Spam Mode
             </span>
             <span style="flex-grow: 1;"></span>
-            <label>
+            <label style="display: flex; align-items: center; gap: 4px;">
+                Mode: 
+                <select id="tiktok-spam-mode">
+                    <option value="safe">Chính xác (Safe)</option>
+                    <option value="turbo">Siêu nhanh (Turbo)</option>
+                    <option value="infinite">Vô hạn (Infinite)</option>
+                </select>
+            </label>
+            <label id="tiktok-spam-count-label" style="display: flex; align-items: center; gap: 4px;">
                 Count: 
                 <input type="number" id="tiktok-spam-count" value="5" min="1" max="99" />
             </label>
-            <label>
+            <label style="display: flex; align-items: center; gap: 4px;">
                 Delay: 
-                <input type="number" id="tiktok-spam-delay" value="80" min="20" max="2000" step="10" /> ms
+                <input type="number" id="tiktok-spam-delay" value="80" min="0" max="2000" step="10" /> ms
             </label>
         </div>
 
@@ -642,6 +726,21 @@ function createOverlay(editorRoot, nativeInput) {
     const sendBtn = document.getElementById('tiktok-chat-fix-send-btn');
     const spamToggle = document.getElementById('tiktok-chat-fix-spam-toggle');
     const spamPanel = document.getElementById('tiktok-chat-fix-spam-panel');
+
+    const spamModeSelect = document.getElementById('tiktok-spam-mode');
+    const spamCountLabel = document.getElementById('tiktok-spam-count-label');
+    const spamCountInput = document.getElementById('tiktok-spam-count');
+
+    if (spamModeSelect && spamCountLabel && spamCountInput) {
+        spamModeSelect.addEventListener('change', () => {
+            if (spamModeSelect.value === 'infinite') {
+                spamCountLabel.style.display = 'none';
+            } else {
+                spamCountLabel.style.display = 'flex';
+            }
+            alignOverlay();
+        });
+    }
 
     textarea.addEventListener('input', () => {
         textarea.style.height = 'auto';

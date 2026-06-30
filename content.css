@@ -165,22 +165,36 @@ button[class*="ButtonSend"] {
     color: var(--tt-fix-text-dark);
 }
 
-.tiktok-chat-fix-spam-panel input {
-    width: 48px;
+.tiktok-chat-fix-spam-panel input,
+.tiktok-chat-fix-spam-panel select {
     background: rgba(0, 0, 0, 0.04);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 4px;
     padding: 2px 4px;
     font-size: 11px;
-    text-align: center;
     color: inherit;
     outline: none;
     font-family: inherit;
 }
 
-.tiktok-chat-fix-container.dark .tiktok-chat-fix-spam-panel input {
+.tiktok-chat-fix-spam-panel input {
+    width: 48px;
+    text-align: center;
+}
+
+.tiktok-chat-fix-spam-panel select {
+    cursor: pointer;
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-spam-panel input,
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-spam-panel select {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.15);
+}
+
+.tiktok-chat-fix-container.dark .tiktok-chat-fix-spam-panel select option {
+    background: #2f2f2f;
+    color: #f1f1f2;
 }
 
 .tiktok-chat-fix-spam-panel label {

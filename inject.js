@@ -44,45 +44,62 @@
         // Message Sending Action
         if (msg.type === 'SEND_MESSAGE') {
             const text = msg.text;
-            const nativeInput = document.querySelector('div[contenteditable="true"].public-DraftEditor-content, div[contenteditable="true"]');
-            if (!nativeInput) return;
+            (async () => {
+                const nativeInput = document.querySelector('div[contenteditable="true"].public-DraftEditor-content, div[contenteditable="true"]');
+                if (!nativeInput) {
+                    window.postMessage({ source: 'tiktok-chat-fix-inject', type: 'SEND_MESSAGE_ACK', success: false }, '*');
+                    return;
+                }
 
-            const editorInfo = findEditorProps(nativeInput);
-            if (!editorInfo) return;
+                let editorInfo = findEditorProps(nativeInput);
+                if (!editorInfo) {
+                    window.postMessage({ source: 'tiktok-chat-fix-inject', type: 'SEND_MESSAGE_ACK', success: false }, '*');
+                    return;
+                }
 
-            try {
-                const { props } = editorInfo;
-                const currentEditorState = props.editorState;
-                
-                const EditorState = currentEditorState.constructor;
-                const currentContent = currentEditorState.getCurrentContent();
-                const ContentState = currentContent.constructor;
-
-                // Issue 2 Fix: Append a single trailing space
-                const processedText = text + ' ';
-                const newContentState = ContentState.createFromText(processedText);
-                
-                // Push the new content state to create the new editor state
-                let newEditorState = EditorState.push(currentEditorState, newContentState, 'insert-characters');
-                
-                // Force selection to end of the injected text
                 try {
-                    const selection = currentEditorState.getSelection();
-                    if (selection) {
-                        const updatedSelection = selection.merge({
-                            anchorOffset: processedText.length,
-                            focusOffset: processedText.length,
-                            isFocused: true
-                        });
-                        newEditorState = EditorState.forceSelection(newEditorState, updatedSelection);
+                    const { props } = editorInfo;
+                    const currentEditorState = props.editorState;
+                    
+                    const EditorState = currentEditorState.constructor;
+                    const currentContent = currentEditorState.getCurrentContent();
+                    const ContentState = currentContent.constructor;
+
+                    // Issue 2 Fix: Append a single trailing space
+                    const processedText = text + ' ';
+                    const newContentState = ContentState.createFromText(processedText);
+                    
+                    // Push the new content state to create the new editor state
+                    let newEditorState = EditorState.push(currentEditorState, newContentState, 'insert-characters');
+                    
+                    // Force selection to end of the injected text
+                    try {
+                        const selection = currentEditorState.getSelection();
+                        if (selection) {
+                            const updatedSelection = selection.merge({
+                                anchorOffset: processedText.length,
+                                focusOffset: processedText.length,
+                                isFocused: true
+                            });
+                            newEditorState = EditorState.forceSelection(newEditorState, updatedSelection);
+                        }
+                    } catch (e) {}
+
+                    // Call the native onChange handler to update React State synchronously
+                    props.onChange(newEditorState);
+
+                    // Wait for React to apply the text change (up to 100ms)
+                    let updated = false;
+                    for (let attempt = 0; attempt < 20; attempt++) {
+                        const info = findEditorProps(nativeInput);
+                        if (info && info.props.editorState.getCurrentContent().getPlainText().trim() === text.trim()) {
+                            updated = true;
+                            break;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 5));
                     }
-                } catch (e) {}
 
-                // Call the native onChange handler to update React State synchronously
-                props.onChange(newEditorState);
-
-                // Dispatch Enter key after a 10ms timeout to allow React to finish batching the state update
-                setTimeout(() => {
+                    // Dispatch Enter key
                     const enterEvent = new KeyboardEvent('keydown', {
                         key: 'Enter',
                         keyCode: 13,
@@ -92,11 +109,26 @@
                         cancelable: true
                     });
                     nativeInput.dispatchEvent(enterEvent);
-                }, 10);
 
-            } catch (err) {
-                console.error('TikTok Chat Fixer: Direct send error:', err);
-            }
+                    // Wait for the input to be cleared by TikTok's handler (up to 500ms)
+                    let cleared = false;
+                    for (let attempt = 0; attempt < 100; attempt++) {
+                        const info = findEditorProps(nativeInput);
+                        const plainText = info ? info.props.editorState.getCurrentContent().getPlainText().trim() : "";
+                        if (plainText === "" && nativeInput.textContent.trim() === "") {
+                            cleared = true;
+                            break;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 5));
+                    }
+
+                    window.postMessage({ source: 'tiktok-chat-fix-inject', type: 'SEND_MESSAGE_ACK', success: cleared }, '*');
+
+                } catch (err) {
+                    console.error('TikTok Chat Fixer: Direct send error:', err);
+                    window.postMessage({ source: 'tiktok-chat-fix-inject', type: 'SEND_MESSAGE_ACK', success: false }, '*');
+                }
+            })();
         }
 
         // Silent Clear Action

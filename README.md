@@ -54,10 +54,31 @@ When the native TikTok emoji picker is clicked, it inserts the emoji into the hi
 A custom spam settings panel is built directly into the top of the chat overlay. 
 *   **Trigger**: Click the 🔥 button to toggle the settings drawer. Or press `Ctrl+Enter` (or `Cmd+Enter` on macOS) to instantly start the loop.
 *   **Options**:
-    *   **Count** (1-99): Number of times to send the text.
-    *   **Delay** (20-2000ms): Gap between consecutive messages.
+    *   **Mode**:
+        *   **Chính xác (Safe)**: Updates React state, dispatches Enter, and waits for a verified send acknowledgment (ACK) before proceeding. Guarantees 100% exact counts.
+        *   **Siêu nhanh (Turbo)**: Blazes at maximum speed. Dispatches messages without checking if the previous one finished sending. (Note: May drop some messages under heavy load).
+        *   **Vô hạn (Infinite)**: Loops endlessly (uses safe ACK sync for tab stability) until stopped.
+    *   **Count** (1-99): Number of times to send (hidden when Infinite is selected).
+    *   **Delay** (0-2000ms): Gap between consecutive messages.
 *   **Cancellation**: Press the **`Escape` (ESC)** key or click the **⏹️ (Stop)** button in the UI to instantly stop a running spam loop at any point.
-*   **Safety**: Direct React state updating enables super fast loops without UI locks, focus resets, or DOM crash warnings.
+*   **Safety & Reliability (ACK Loop)**: Used in Safe and Infinite modes, the State-Verified Acknowledgment (ACK) Loop prevents dropped messages and tab freezes.
+
+```mermaid
+sequenceDiagram
+    participant Content as content.js
+    participant Inject as inject.js
+    participant React as TikTok React/Draft.js
+
+    Content->>Inject: SEND_MESSAGE (text)
+    Note over Inject: 1. Update React state with text
+    Note over Inject: 2. Verify text is in state via Fiber props
+    Inject->>React: Dispatch KeyboardEvent (Enter)
+    Note over React: 3. TikTok processes Enter & clears input
+    Note over Inject: 4. Poll until React state and DOM are empty
+    Inject->>Content: SEND_MESSAGE_ACK (success)
+    Note over Content: 5. Scroll down & Wait for user delay
+    Note over Content: 6. Proceed to next message in loop
+```
 
 ### 6. Auto-Sticker Suggestions
 Type keyword synonyms to trigger instant sticker suggestions.
@@ -79,13 +100,21 @@ Type keyword synonyms to trigger instant sticker suggestions.
 ### 3. Chế Độ Spam Tự Động / Auto-Spam Mode (🔥 Mode)
 *   **Tiếng Việt**:
     *   Nhấp vào nút **🔥** để bật/tắt bảng cấu hình Spam.
-    *   Nhập **Số lượng (Count)** (từ 1 - 99 tin) và **Độ trễ (Delay)** (từ 20ms - 2000ms).
-    *   Nhấn **Ctrl + Enter** (hoặc **Cmd + Enter** trên Mac) để kích hoạt spam nhanh tin nhắn đang nhập.
+    *   Chọn **Chế độ (Mode)**:
+        *   **Chính xác (Safe)**: Gửi chuẩn số lượng đã cài đặt bằng cơ chế chờ phản hồi (ACK).
+        *   **Siêu nhanh (Turbo)**: Gửi liên tiếp cực nhanh không cần chờ xác nhận (có thể bị hụt vài tin).
+        *   **Vô hạn (Infinite)**: Gửi liên tục không dừng lại cho đến khi nhấn phím **Escape (ESC)** hoặc nút **⏹️**.
+    *   Nhập **Số lượng (Count)** (từ 1 - 99 tin, ẩn khi chọn Vô hạn) và **Độ trễ (Delay)** (từ 0ms - 2000ms).
+    *   Nhấn **Ctrl + Enter** (hoặc **Cmd + Enter** trên Mac) để kích hoạt spam tin nhắn đang nhập.
     *   Nhấn **Escape (ESC)** hoặc nút **⏹️** để dừng spam khẩn cấp bất kỳ lúc nào.
 *   **English**:
     *   Click the **🔥** button to toggle the Spam Settings Panel.
-    *   Configure **Count** (1-99) and **Delay** (20-2000ms).
-    *   Press **Ctrl + Enter** (or **Cmd + Enter** on macOS) to instantly start the spam loop for the current message.
+    *   Select **Mode**:
+        *   **Safe**: Sends exact target count by utilizing verified ACK responses.
+        *   **Turbo**: Maximizes sending speed without waiting for feedback (might skip messages under load).
+        *   **Infinite**: Loops endlessly until stopped.
+    *   Configure **Count** (1-99, hidden in Infinite mode) and **Delay** (0-2000ms).
+    *   Press **Ctrl + Enter** (or **Cmd + Enter** on macOS) to instantly start the spam loop.
     *   Press **Escape (ESC)** or click the **⏹️ (Stop)** button to abort the loop immediately.
 
 ### 4. Gợi Ý Sticker Động / Auto-Stickers Suggestion
